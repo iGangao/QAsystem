@@ -359,8 +359,8 @@ if __name__=="__main__":
     
     
     mydataset = MyDataset(
-        dataset_path="/data/agl/Baichuan-13B-Finetuning/data", 
-        dataset_name="alpaca_data_zh_51k.json",
+        dataset_path="../data", 
+        dataset_name=os.listdir("../data"),
         tokenizer=tokenizer
     )
     dataset = mydataset.build_dataset()
@@ -373,7 +373,7 @@ if __name__=="__main__":
         lora_target="W_pack",
     )
     training_args = Seq2SeqTrainingArguments(
-        output_dir="./output",
+        output_dir="../output",
         per_device_train_batch_size=1,
         gradient_accumulation_steps=1,
         logging_steps=10,
@@ -401,4 +401,4 @@ if __name__=="__main__":
     trainer.save_state()
     trainer.save_model()
     if trainer.is_world_process_zero():
-        plot_loss("./output", keys=["loss", "eval_loss"])
+        plot_loss("../output", keys=["loss", "eval_loss"])

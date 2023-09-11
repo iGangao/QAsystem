@@ -220,10 +220,10 @@ if __name__ == "__main__":
         padding_side="right",
     )
     mydataset = MyDataset(
-        dataset_path="/data/agl/Baichuan-13B-Finetuning/data", 
-        dataset_name="alpaca_data_zh_51k.json",
+        dataset_path="../data", 
+        dataset_names=os.listdir("../data"),
         tokenizer=tokenizer)
 
-    training_args = Seq2SeqTrainingArguments(output_dir="./output")
+    training_args = Seq2SeqTrainingArguments(output_dir="../output")
 
     dataset = mydataset.build_dataset(training_args=training_args)
