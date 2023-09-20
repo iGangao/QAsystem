@@ -6,6 +6,8 @@ from dataclasses import asdict, dataclass, field
 from transformers.generation.utils import GenerationConfig
 from transformers.modeling_utils import PreTrainedModel
 from transformers.tokenization_utils import PreTrainedTokenizer
+from langchain.embeddings.huggingface import HuggingFaceEmbeddings
+from langchain.vectorstores import FAISS
 from transformers import (
     AutoConfig,
     AutoModelForCausalLM,
@@ -107,6 +109,14 @@ def init_model():
 
     generating_args = GeneratingArguments
     model, tokenizer = load_pretrained()
+    model_kwargs = {'device': 'cpu'}
+    encode_kwargs = {'normalize_embeddings': False}
+    embeddings = HuggingFaceEmbeddings(
+        model_name="GanymedeNil/text2vec-large-chinese",
+        model_kwargs=model_kwargs,
+        encode_kwargs=encode_kwargs
+    )
+    db = FAISS.load_local("faiss_index", embeddings)
 
     model.generation_config = GenerationConfig.from_pretrained(
         "baichuan-inc/Baichuan-13B-Chat",
@@ -120,16 +130,16 @@ def init_model():
     model.generation_config.num_beams = generating_args.num_beams
     model.generation_config.length_penalty = generating_args.length_penalty
     
-    return model, tokenizer
+    return model, tokenizer, db
 
 
 # App title
 st.set_page_config(page_title="QA_system Chatbot")
-st.title("QA_System")
+st.title("Retrieval-Augmented LLMs")
 
 def main():
-    llm, tokenizer = init_model()
-
+    llm, tokenizer, db = init_model()
+    
     # Store LLM generated responses
     if "messages" not in st.session_state.keys():
         st.session_state.messages = [{"role": "assistant", "content": ""}]
@@ -155,14 +165,16 @@ def main():
             yield response
 
     def generate_baichuan_prompt(prompt):
-        return prompt
+        docs=db.similarity_search(prompt)
+        question = docs[0].page_content
+        answer = docs[0].metadata["answer"]
+        TEMPLATE = """已知{question}\n{answer}\n{prompt}"""
+        return TEMPLATE.format(question, answer, prompt)
     
 
     # User-provided prompt
     if prompt := st.chat_input(disabled=False):
         prompt = generate_baichuan_prompt(prompt)
-    #     prompt = """{"question": "WiFi调制技术？带宽？遵循的协议？连接的方式？", "answer": "Wi-Fi调制技术是一种用于实现无线局域网络（WLAN）的调制技术，主要用于在无线信道中传输数据。Wi-Fi调制技术采用了OFDM（正交频分复用）和DSSS（直接序列扩频）等多种调制技术，可以实现高速、可靠的数据传输。Wi-Fi标准规定了不同频段和带宽的无线网络的工作方式，其中最常用的是2.4GHz和5GHz频段的Wi-Fi网络。Wi-Fi网络的带宽通常为20MHz、40MHz、80MHz或160MHz，不同带宽的网络可以支持不同的数据传输速率。在协议方面，Wi-Fi网络遵循了IEEE 802.11系列标准，其中包括了802.11a、802.11b、802.11g、802.11n、802.11ac、802.11ax等多个版本。不同版本的协议支持的数据传输速率和信道带宽等不同，可以根据具体的应用需求进行选择。在连接方式方面，Wi-Fi网络通常采用基于无线接入点（Access Point，AP）的无线连接方式，通过无线接入点来连接多个无线设备，形成一个无线局域网络。此外，也可以采用无线点对点或者无线Mesh网络等方式进行连接。Wi-Fi调制技术是一种重要的无线通信技术，具有高速、可靠、灵活等优点，在移动互联网应用、智能家居、工业自动化等领域得到广泛应用。"}, {"question": "通信原理：3GPP", "answer": "3GPP（Third Generation Partnership Project）是一个由全球电信标准化组织联盟组成的合作机构，成立于1998年。3GPP致力于制定和发布全球通信标准，包括移动通信、移动宽带和多媒体通信等领域。它是制定移动通信技术标准的主要组织之一。3GPP的成员包括来自全球各地的电信运营商、电信设备制造商、研究机构和其他相关组织。3GPP的成员共同合作，制定新的技术规范和标准，以确保各种通信设备和系统之间的互操作性和相互兼容性。3GPP的工作是开放的，它允许任何人或组织参与，并通过开放式讨论、测试和评估来制定标准。3GPP制定的标准主要包括GSM、UMTS、LTE、5G等移动通信技术标准。这些标准是全球通信行业的基础，使得不同制造商的设备可以相互兼容和交互操作，从而实现了全球范围内的移动通信互联互通。同时，这些标准也推动了移动通信技术的快速发展和普及，为用户提供了更加便捷和高效的通信服务。"}
-    # 介绍一下wifi调制技术？"""
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
             st.write(prompt)
@@ -181,4 +193,4 @@ def main():
 if __name__ == "__main__":
     main()
     # quick start
-    # `streamlit run chatbot`
+    # `streamlit run chatbot.py`
